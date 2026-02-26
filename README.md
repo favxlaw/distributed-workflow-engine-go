@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This project is a small workflow service written in Go.  
+This project is a simple workflow service written in Go.  
 It models order processing as a finite state machine and enforces state transitions using DynamoDB conditional writes.
 
 The goal is simple: make state transitions correct under real-world conditions like retries, duplicate events, and concurrent updates.
@@ -93,6 +93,23 @@ State changes are only applied if:
 Invalid transitions and concurrent conflicts fail fast.
 
 ---
+
+### Allowed Transitions
+
+| Current State | Allowed Next States      |
+|--------------|--------------------------|
+| Created     | Paid, Cancelled          |
+| Paid        | Packed, Cancelled        |
+| Packed      | Shipped                  |
+| Shipped     | Delivered                |
+| Delivered   | — (terminal)             |
+| Cancelled   | — (terminal)             |
+
+Transitions outside this table are rejected.
+
+Enforcement happens at two levels:
+1. The domain layer validates allowed transitions.
+2. DynamoDB conditional writes ensure the current state matches the expected state before mutation.
 
 ## Running Locally
 
