@@ -25,7 +25,7 @@ func setupTestStore(t *testing.T) (*DynamoStore, func()) {
 		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("x", "y", "z")),
 		awsconfig.WithEndpointResolver(aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
 			if strings.EqualFold(service, dynamodb.ServiceID) {
-				return aws.Endpoint{URL: "http://localhost:8000", SigningRegion: "us-east-1"}, nil
+				return aws.Endpoint{URL: "http://localhost:8006", SigningRegion: "us-east-1"}, nil
 			}
 			return aws.Endpoint{}, &aws.EndpointNotFoundError{}
 		})),
