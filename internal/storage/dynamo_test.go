@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -23,18 +22,15 @@ func setupTestStore(t *testing.T) (*DynamoStore, func()) {
 	cfg, err := awsconfig.LoadDefaultConfig(ctx,
 		awsconfig.WithRegion("us-east-1"),
 		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("x", "y", "z")),
-		awsconfig.WithEndpointResolver(aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
-			if strings.EqualFold(service, dynamodb.ServiceID) {
-				return aws.Endpoint{URL: "http://localhost:8006", SigningRegion: "us-east-1"}, nil
-			}
-			return aws.Endpoint{}, &aws.EndpointNotFoundError{}
-		})),
 	)
 	if err != nil {
 		t.Fatalf("failed to load aws config: %v", err)
 	}
 
-	client := dynamodb.NewFromConfig(cfg)
+	// Point at DynamoDB Local using the modern service-specific BaseEndpoint.
+	client := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
+		o.BaseEndpoint = aws.String("http://localhost:8006")
+	})
 
 	_, err = client.CreateTable(ctx, &dynamodb.CreateTableInput{
 		TableName: aws.String(testTableName),
