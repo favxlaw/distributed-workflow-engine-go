@@ -52,7 +52,7 @@ func (s *DynamoStore) TransitionOrder(ctx context.Context, order *workflow.Order
 	}
 
 	if !workflow.IsValidTransition(order.State, newState) {
-		return fmt.Errorf("invalid transition from %s to %s", order.State, newState)
+		return workflow.ErrInvalidTransition{From: order.State, To: newState}
 	}
 
 	// Optimistic locking: only update if the current version matches the expected version.
@@ -95,6 +95,67 @@ func (s *DynamoStore) TransitionOrder(ctx context.Context, order *workflow.Order
 	order.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updatedAt)
 
 	return nil
+}
+
+func (s *DynamoStore) GetOrder(ctx context.Context, id string) (*workflow.Order, error) {
+	resp, err := s.Client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: &s.TableName,
+		Key: map[string]types.AttributeValue{
+			"id": &types.AttributeValueMemberS{Value: id},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(resp.Item) == 0 {
+		return nil, ErrOrderNotFound{ID: id}
+	}
+
+	idAttr, ok := resp.Item["id"].(*types.AttributeValueMemberS)
+	if !ok {
+		return nil, fmt.Errorf("order item missing id")
+	}
+
+	stateAttr, ok := resp.Item["state"].(*types.AttributeValueMemberS)
+	if !ok {
+		return nil, fmt.Errorf("order item missing state")
+	}
+
+	versionAttr, ok := resp.Item["version"].(*types.AttributeValueMemberN)
+	if !ok {
+		return nil, fmt.Errorf("order item missing version")
+	}
+	version, err := strconv.Atoi(versionAttr.Value)
+	if err != nil {
+		return nil, err
+	}
+
+	createdAtAttr, ok := resp.Item["created_at"].(*types.AttributeValueMemberS)
+	if !ok {
+		return nil, fmt.Errorf("order item missing created_at")
+	}
+	createdAt, err := time.Parse(time.RFC3339Nano, createdAtAttr.Value)
+	if err != nil {
+		return nil, err
+	}
+
+	updatedAtAttr, ok := resp.Item["updated_at"].(*types.AttributeValueMemberS)
+	if !ok {
+		return nil, fmt.Errorf("order item missing updated_at")
+	}
+	updatedAt, err := time.Parse(time.RFC3339Nano, updatedAtAttr.Value)
+	if err != nil {
+		return nil, err
+	}
+
+	return &workflow.Order{
+		ID:        idAttr.Value,
+		State:     workflow.OrderState(stateAttr.Value),
+		Version:   version,
+		CreatedAt: createdAt,
+		UpdatedAt: updatedAt,
+	}, nil
 }
 
 func awsString(s string) *string {
