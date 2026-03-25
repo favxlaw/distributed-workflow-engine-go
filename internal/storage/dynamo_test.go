@@ -29,7 +29,7 @@ func setupTestStore(t *testing.T) (*DynamoStore, func()) {
 
 	// Point at DynamoDB Local using the modern service-specific BaseEndpoint.
 	client := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
-		o.BaseEndpoint = aws.String("http://localhost:8006")
+		o.BaseEndpoint = aws.String(dynamoTestEndpoint())
 	})
 
 	_, err = client.CreateTable(ctx, &dynamodb.CreateTableInput{
