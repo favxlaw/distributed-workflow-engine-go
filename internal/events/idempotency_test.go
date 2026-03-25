@@ -2,7 +2,6 @@ package events
 
 import (
 	"context"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -16,6 +15,7 @@ import (
 
 const testEventsTable = "processed_events"
 
+
 func setupTestStore(t *testing.T) (*EventStore, func()) {
 	t.Helper()
 	ctx := context.Background()
@@ -23,18 +23,14 @@ func setupTestStore(t *testing.T) (*EventStore, func()) {
 	cfg, err := awsconfig.LoadDefaultConfig(ctx,
 		awsconfig.WithRegion("us-east-1"),
 		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("x", "y", "z")),
-		awsconfig.WithEndpointResolver(aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
-			if strings.EqualFold(service, dynamodb.ServiceID) {
-				return aws.Endpoint{URL: "http://localhost:8006", SigningRegion: "us-east-1"}, nil
-			}
-			return aws.Endpoint{}, &aws.EndpointNotFoundError{}
-		})),
 	)
 	if err != nil {
 		t.Fatalf("failed to load aws config: %v", err)
 	}
 
-	client := dynamodb.NewFromConfig(cfg)
+	client := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
+		o.BaseEndpoint = aws.String(dynamoTestEndpoint())
+	})
 
 	_, err = client.CreateTable(ctx, &dynamodb.CreateTableInput{
 		TableName: aws.String(testEventsTable),
@@ -62,7 +58,6 @@ func setupTestStore(t *testing.T) (*EventStore, func()) {
 	}
 
 	store := NewEventStore(client, testEventsTable)
-
 	cleanup := func() {
 		_, _ = client.DeleteTable(ctx, &dynamodb.DeleteTableInput{TableName: aws.String(testEventsTable)})
 	}
